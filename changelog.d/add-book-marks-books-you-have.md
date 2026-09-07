@@ -1,0 +1,2 @@
+### Added
+- **Add Book now says when you already have a result, instead of offering to add it again** — a search returns whatever the providers know, with no regard for what is already on your shelves, so a book you added last week came back looking exactly like one you had never seen. Results the library already holds now read **In library** and cannot be added a second time. The check is by provider ID, so it recognises the same book however its title is written, and it is scoped to your own library — one user is never told what another has added.

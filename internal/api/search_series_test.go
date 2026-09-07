@@ -118,3 +118,69 @@ func TestSearchResultStillCarriesTheBook(t *testing.T) {
 		t.Error("SeriesRefs leaked into JSON; it is meant to stay internal")
 	}
 }
+
+type stubBookPresence struct {
+	present map[string]bool
+	userIDs []int64
+	err     error
+}
+
+func (s *stubBookPresence) ForeignIDsInLibrary(_ context.Context, ids []string, userID int64) (map[string]bool, error) {
+	s.userIDs = append(s.userIDs, userID)
+	if s.err != nil {
+		return nil, s.err
+	}
+	out := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if s.present[id] {
+			out[id] = true
+		}
+	}
+	return out, nil
+}
+
+func TestMarkHeldBooksFlagsOnlyWhatTheLibraryHas(t *testing.T) {
+	presence := &stubBookPresence{present: map[string]bool{"hc:Held": true}}
+	h := NewSearchHandler(nil).WithBookPresence(presence)
+
+	results := h.withSeries(context.Background(), []models.Book{
+		bookWithSeries("Held"),
+		bookWithSeries("Wanted"),
+	})
+	h.markHeldBooks(context.Background(), 7, results)
+
+	if !results[0].InLibrary {
+		t.Error("a book the library holds was not marked")
+	}
+	if results[1].InLibrary {
+		t.Error("a book the library does not hold was marked")
+	}
+	// Scoping is the whole point: one user must not be told about another's
+	// books.
+	if len(presence.userIDs) != 1 || presence.userIDs[0] != 7 {
+		t.Errorf("lookup scoped to %v, want the caller's user", presence.userIDs)
+	}
+}
+
+func TestMarkHeldBooksKeepsResultsWhenTheLookupFails(t *testing.T) {
+	presence := &stubBookPresence{err: errors.New("database is gone")}
+	h := NewSearchHandler(nil).WithBookPresence(presence)
+
+	results := h.withSeries(context.Background(), []models.Book{bookWithSeries("Book")})
+	h.markHeldBooks(context.Background(), 0, results)
+
+	if len(results) != 1 || results[0].InLibrary {
+		t.Fatalf("failed lookup changed the results: %+v", results)
+	}
+}
+
+// Without a presence source the search behaves as it did before.
+func TestMarkHeldBooksIsANoOpWithoutASource(t *testing.T) {
+	h := NewSearchHandler(nil)
+	results := h.withSeries(context.Background(), []models.Book{bookWithSeries("Book")})
+	h.markHeldBooks(context.Background(), 0, results)
+
+	if results[0].InLibrary {
+		t.Error("marked as held with no library to ask")
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/vavallee/bindery/internal/auth"
 	"github.com/vavallee/bindery/internal/metadata"
 	"github.com/vavallee/bindery/internal/models"
 )
@@ -17,6 +18,15 @@ type SearchHandler struct {
 	// series is optional: without it results carry no series information,
 	// which is what the search API did before.
 	series SeriesPresence
+	// books is optional in the same way: without it no result is marked as
+	// already held.
+	books BookPresence
+}
+
+// BookPresence answers which provider book IDs the library already holds for a
+// given user. userID follows auth.ListScopeUserID: 0 means unrestricted.
+type BookPresence interface {
+	ForeignIDsInLibrary(ctx context.Context, foreignIDs []string, userID int64) (map[string]bool, error)
 }
 
 // SeriesPresence answers which provider series IDs the library already holds.
@@ -35,6 +45,12 @@ func (h *SearchHandler) WithSeriesPresence(series SeriesPresence) *SearchHandler
 	return h
 }
 
+// WithBookPresence lets book search mark the results already in the library.
+func (h *SearchHandler) WithBookPresence(books BookPresence) *SearchHandler {
+	h.books = books
+	return h
+}
+
 // bookSearchResult is a book as the search UI needs it: the book itself, plus
 // the series it belongs to.
 //
@@ -50,6 +66,9 @@ type bookSearchResult struct {
 	SeriesPosition  string `json:"seriesPosition,omitempty"`
 	// SeriesInLibrary is only meaningful when SeriesForeignID is set.
 	SeriesInLibrary bool `json:"seriesInLibrary,omitempty"`
+	// InLibrary marks a result the library already holds, so the UI can say so
+	// rather than offer to add it a second time.
+	InLibrary bool `json:"inLibrary,omitempty"`
 }
 
 // primarySeriesRef picks the series a book is chiefly part of, preferring the
@@ -108,6 +127,37 @@ func (h *SearchHandler) withSeries(ctx context.Context, books []models.Book) []b
 	return out
 }
 
+// markHeldBooks flags the results already in the library.
+//
+// Like the series mark, a lookup that fails costs the mark rather than the
+// search. userID scopes the answer so one user is never told about another's
+// books.
+func (h *SearchHandler) markHeldBooks(ctx context.Context, userID int64, results []bookSearchResult) {
+	if h.books == nil {
+		return
+	}
+	ids := make([]string, 0, len(results))
+	for i := range results {
+		if results[i].Book != nil && results[i].Book.ForeignID != "" {
+			ids = append(ids, results[i].Book.ForeignID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+
+	present, err := h.books.ForeignIDsInLibrary(ctx, ids, userID)
+	if err != nil {
+		slog.Warn("could not tell which searched books are already in the library", "error", err)
+		return
+	}
+	for i := range results {
+		if results[i].Book != nil && present[results[i].Book.ForeignID] {
+			results[i].InLibrary = true
+		}
+	}
+}
+
 // writeUpstreamError responds with 502 Bad Gateway and a message that makes
 // it obvious the failure is on the metadata provider side (OpenLibrary,
 // Google Books, Hardcover), not inside Bindery. Using 500 for this conflates
@@ -156,7 +206,10 @@ func (h *SearchHandler) SearchBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, h.withSeries(r.Context(), books))
+	results := h.withSeries(r.Context(), books)
+	h.markHeldBooks(r.Context(), auth.ListScopeUserID(r.Context()), results)
+
+	writeJSON(w, http.StatusOK, results)
 }
 
 // Lookup resolves a single book by a stable identifier passed as a query
