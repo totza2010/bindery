@@ -123,7 +123,12 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
             </button>
           </div>
 
-          <div className="mt-4 space-y-2 max-h-[50vh] overflow-y-auto">
+          {/* The modal body above is already the scroll container. Giving the
+              results their own capped, scrolling box put a second scrollbar
+              inside the first, so the wheel moved whichever the pointer
+              happened to be over and the end of a long result list was awkward
+              to reach. One scrolling region, header and footer fixed. */}
+          <div className="mt-4 space-y-2">
             {results.map(book => {
               const key = book.foreignBookId || book.title
               const isAdded = added.has(book.foreignBookId)

@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react'
+
+// How many missing books a series card shows before offering the rest. Eight
+// keeps a card scannable; the remainder used to be announced and then left
+// unreachable.
+const missingCollapsedCount = 8
 import { Link, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { api, MediaType, Series, SeriesHardcoverDiff, SeriesHardcoverDiffBook, SeriesHardcoverLink, SeriesHardcoverSearchResult, SystemStatus } from '../api/client'
@@ -23,6 +28,9 @@ export default function SeriesPage() {
   // Format to target when adding missing Hardcover books, keyed by series id.
   // Defaults to ebook to preserve the previous add behaviour.
   const [fillMediaType, setFillMediaType] = useState<Record<number, MediaType>>({})
+  // Series whose full missing list the reader asked for. A long series is
+  // collapsed by default so one card cannot fill the page.
+  const [showAllMissing, setShowAllMissing] = useState<Record<number, boolean>>({})
   const [linking, setLinking] = useState<number | null>(null)
   const [linkResult, setLinkResult] = useState<Record<number, string>>({})
   const [linkModalSeries, setLinkModalSeries] = useState<Series | null>(null)
@@ -279,6 +287,8 @@ export default function SeriesPage() {
             const bookCount = books.length
             const gapCount = books.filter(b => b.book && b.book.status !== 'imported').length
             const diff = diffs[series.id]
+            const allMissingShown = !!showAllMissing[series.id]
+            const visibleMissing = allMissingShown ? diff?.missing ?? [] : (diff?.missing ?? []).slice(0, missingCollapsedCount)
             const hardcoverMissingEstimate = enhancedHardcoverApi ? Math.max(0, (series.hardcoverLink?.hardcoverBookCount ?? 0) - bookCount) : 0
             const hardcoverMissingCount = enhancedHardcoverApi ? (diff?.missingCount ?? hardcoverMissingEstimate) : 0
             const displayMissingCount = Math.max(gapCount, hardcoverMissingCount)
@@ -498,8 +508,12 @@ export default function SeriesPage() {
                       <div className="px-4 pb-3 text-sm text-rose-600 dark:text-rose-400">{diffErrors[series.id]}</div>
                     )}
                     {diff && diff.missing.length > 0 && (
-                      <div className="px-4 pb-4 space-y-2">
-                        {diff.missing.slice(0, 8).map(book => {
+                      // Expanding scrolls within the card rather than growing
+                      // it without limit: a series can carry dozens of missing
+                      // books, and before this the ones past the eighth could
+                      // not be reached at all.
+                      <div className={`px-4 pb-4 space-y-2 ${allMissingShown ? 'max-h-[60vh] overflow-y-auto' : ''}`}>
+                        {visibleMissing.map(book => {
                           const rowClass = 'flex items-center gap-3 p-3 rounded-md bg-slate-200/50 dark:bg-zinc-800/50'
                           const rowInner = (
                             <>
@@ -544,8 +558,17 @@ export default function SeriesPage() {
                             </div>
                           )
                         })}
-                        {diff.missing.length > 8 && (
-                          <p className="text-xs text-slate-600 dark:text-zinc-500 px-1">{diff.missing.length - 8} more missing books</p>
+                        {diff.missing.length > missingCollapsedCount && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllMissing(prev => ({ ...prev, [series.id]: !allMissingShown }))}
+                            aria-expanded={allMissingShown}
+                            className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline px-1"
+                          >
+                            {allMissingShown
+                              ? t('series.showFewerMissing')
+                              : t('series.showAllMissing', { count: diff.missing.length - missingCollapsedCount })}
+                          </button>
                         )}
                       </div>
                     )}

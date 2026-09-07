@@ -486,7 +486,9 @@
   },
   "series": {
     "deleteConfirm": "Delete \"{{title}}\" from Series? Linked books will stay in your library.",
-    "deleteTitle": "Remove series"
+    "deleteTitle": "Remove series",
+    "showAllMissing": "Show {{count}} more missing books",
+    "showFewerMissing": "Show fewer"
   },
   "importHints": {
     "heading": "Already have files on disk?",
