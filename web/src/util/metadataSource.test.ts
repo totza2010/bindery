@@ -28,10 +28,36 @@ describe('metadataSourceLink', () => {
   })
 
   it('returns null for providers without a reliable public URL', () => {
-    expect(metadataSourceLink('hc:12345', 'book')).toBeNull()
     expect(metadataSourceLink('dnb:123456789', 'book')).toBeNull()
     expect(metadataSourceLink('abs:abc', 'book')).toBeNull()
     expect(metadataSourceLink('calibre:7', 'book')).toBeNull()
+  })
+
+  // Hardcover stores the slug its own site routes on, so both kinds resolve.
+  it('links a Hardcover book and author to their public pages', () => {
+    expect(metadataSourceLink('hc:project-hail-mary', 'book')).toEqual({
+      url: 'https://hardcover.app/books/project-hail-mary',
+      label: 'Hardcover',
+    })
+    expect(metadataSourceLink('hc:andy-weir', 'author')).toEqual({
+      url: 'https://hardcover.app/authors/andy-weir',
+      label: 'Hardcover',
+    })
+  })
+
+  // toBook and toAuthor fall back to the numeric primary key when the record
+  // has no slug, and hardcover.app 404s on those.
+  it('returns null for a Hardcover id that is the numeric fallback', () => {
+    expect(metadataSourceLink('hc:12345', 'book')).toBeNull()
+    expect(metadataSourceLink('hc:12345', 'author')).toBeNull()
+    expect(metadataSourceLink('hc:', 'book')).toBeNull()
+  })
+
+  it('escapes a Hardcover slug that is not URL safe', () => {
+    expect(metadataSourceLink('hc:a b/c', 'book')).toEqual({
+      url: 'https://hardcover.app/books/a%20b%2Fc',
+      label: 'Hardcover',
+    })
   })
 
   it('returns null for empty / malformed ids', () => {
