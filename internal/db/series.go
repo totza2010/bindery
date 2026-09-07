@@ -669,14 +669,15 @@ func (r *SeriesRepo) ForeignIDsInLibrary(ctx context.Context, foreignIDs []strin
 	}
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(wanted)), ",")
-	query := "SELECT foreign_id FROM series WHERE foreign_id IN (" + placeholders + ")" +
-		" UNION SELECT hardcover_series_id FROM series_hardcover_links WHERE hardcover_series_id IN (" + placeholders + ")"
 
 	args := make([]any, 0, len(wanted)*2)
 	args = append(args, wanted...)
 	args = append(args, wanted...)
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT foreign_id FROM series WHERE foreign_id IN ("+placeholders+")"+
+			" UNION SELECT hardcover_series_id FROM series_hardcover_links WHERE hardcover_series_id IN ("+placeholders+")",
+		args...) // #nosec G202 -- placeholders is a generated "?, ?, …" list; the foreign ids are bound arguments
 	if err != nil {
 		return nil, fmt.Errorf("series foreign ids in library: %w", err)
 	}

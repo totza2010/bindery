@@ -519,14 +519,15 @@ func (r *BookRepo) ForeignIDsInLibrary(ctx context.Context, foreignIDs []string,
 	}
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(wanted)), ",")
-	query := "SELECT foreign_id FROM books WHERE foreign_id IN (" + placeholders + ")"
+	scope := ""
 	args := wanted
 	if userID != 0 {
-		query += " AND owner_user_id = ?"
+		scope = " AND owner_user_id = ?"
 		args = append(append([]any{}, wanted...), userID)
 	}
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT foreign_id FROM books WHERE foreign_id IN ("+placeholders+")"+scope, args...) // #nosec G202 -- placeholders is a generated "?, ?, …" list; the foreign ids and the owner are bound arguments
 	if err != nil {
 		return nil, fmt.Errorf("book foreign ids in library: %w", err)
 	}
