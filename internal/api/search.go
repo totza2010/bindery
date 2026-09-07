@@ -138,8 +138,8 @@ func (h *SearchHandler) markHeldBooks(ctx context.Context, userID int64, results
 	}
 	ids := make([]string, 0, len(results))
 	for i := range results {
-		if results[i].Book != nil && results[i].Book.ForeignID != "" {
-			ids = append(ids, results[i].Book.ForeignID)
+		if results[i].Book != nil && results[i].ForeignID != "" {
+			ids = append(ids, results[i].ForeignID)
 		}
 	}
 	if len(ids) == 0 {
@@ -152,7 +152,7 @@ func (h *SearchHandler) markHeldBooks(ctx context.Context, userID int64, results
 		return
 	}
 	for i := range results {
-		if results[i].Book != nil && present[results[i].Book.ForeignID] {
+		if results[i].Book != nil && present[results[i].ForeignID] {
 			results[i].InLibrary = true
 		}
 	}
