@@ -291,6 +291,71 @@ describe('SeriesPage', () => {
     expect(await screen.findByText('2 matched · 1 missing')).toBeInTheDocument()
   })
 
+  // A series card showed the first eight missing books and then announced how
+  // many more there were, with no way to reach them.
+  it('reveals the missing books past the eighth on request', async () => {
+    const link = {
+      id: 1,
+      seriesId: 21,
+      hardcoverSeriesId: 'hc-series:1185',
+      hardcoverProviderId: '1185',
+      hardcoverSlug: 'harry-potter',
+      hardcoverTitle: 'Harry Potter',
+      hardcoverAuthorName: 'J.K. Rowling',
+      hardcoverBookCount: 12,
+      confidence: 1,
+      linkedBy: 'manual',
+      linkedAt: '2026-01-01T00:00:00Z',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    }
+    const missing = Array.from({ length: 12 }, (_, i) => ({
+      foreignBookId: `hc:book-${i + 1}`,
+      providerId: `${i + 1}`,
+      title: `Missing Book ${i + 1}`,
+      position: `${i + 1}`,
+      authorName: 'J.K. Rowling',
+    }))
+    vi.mocked(api.getSeriesHardcoverDiff).mockResolvedValue({
+      seriesId: 21,
+      link,
+      present: [],
+      missing,
+      localOnly: [],
+      uncertain: [],
+      presentCount: 0,
+      missingCount: 12,
+    } as never)
+
+    renderSeriesPage([
+      {
+        id: 21,
+        foreignSeriesId: 'series-21',
+        title: 'Harry Potter',
+        description: '',
+        monitored: true,
+        books: [],
+        hardcoverLink: link,
+      } as never,
+    ])
+
+    fireEvent.click(await screen.findByRole('heading', { name: 'Harry Potter' }))
+
+    expect(await screen.findByText('Missing Book 8')).toBeInTheDocument()
+    expect(screen.queryByText('Missing Book 9')).not.toBeInTheDocument()
+
+    const reveal = await screen.findByRole('button', { name: /Show 4 more missing books/i })
+    expect(reveal).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(reveal)
+
+    expect(await screen.findByText('Missing Book 12')).toBeInTheDocument()
+    const collapse = screen.getByRole('button', { name: /Show fewer/i })
+    expect(collapse).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(collapse)
+    expect(screen.queryByText('Missing Book 9')).not.toBeInTheDocument()
+  })
+
   it('opens linked Hardcover series without auto-linking again', async () => {
     renderSeriesPage([
       {
