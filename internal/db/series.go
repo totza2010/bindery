@@ -689,6 +689,24 @@ func (r *SeriesRepo) CreateOrGet(ctx context.Context, s *models.Series) error {
 	if strings.TrimSpace(s.ForeignID) == "" {
 		return fmt.Errorf("upsert series %q: refusing to create a series with an empty foreign_id", s.Title)
 	}
+	// A series the user made and linked by hand keeps the foreign_id it was
+	// created with — CreateManual writes "manual:series:<nanos>" purely to
+	// satisfy the NOT NULL UNIQUE column — and records the provider's id in
+	// series_hardcover_links instead. Keyed only on foreign_id, the insert
+	// below then misses it and adds a second series under the same name, which
+	// is what happens today: link Harry Potter by hand, add a book from it,
+	// and the library ends up with the linked series and an auto-created twin.
+	//
+	// A link is the user saying these are the same series, which is better
+	// evidence than the title comparison upsertHardcoverSeries falls back to
+	// for ABS imports, and needs no ambiguity guard.
+	if linked, err := r.seriesIDByHardcoverLink(ctx, s.ForeignID); err != nil {
+		return err
+	} else if linked != 0 {
+		s.ID = linked
+		return nil
+	}
+
 	now := time.Now().UTC()
 	result, err := r.db.ExecContext(ctx,
 		"INSERT OR IGNORE INTO series (foreign_id, title, description, created_at) VALUES (?, ?, ?, ?)",
@@ -708,6 +726,27 @@ func (r *SeriesRepo) CreateOrGet(ctx context.Context, s *models.Series) error {
 		return fmt.Errorf("get existing series id: %w", err)
 	}
 	return nil
+}
+
+// seriesIDByHardcoverLink returns the series a Hardcover series ID is linked
+// to, or 0 when nothing is linked to it.
+//
+// Only Hardcover IDs are ever in that table, so anything else skips the query.
+func (r *SeriesRepo) seriesIDByHardcoverLink(ctx context.Context, foreignID string) (int64, error) {
+	foreignID = strings.TrimSpace(foreignID)
+	if !strings.HasPrefix(foreignID, HardcoverSeriesIDPrefix) {
+		return 0, nil
+	}
+	var id int64
+	err := r.db.QueryRowContext(ctx,
+		"SELECT series_id FROM series_hardcover_links WHERE hardcover_series_id = ?", foreignID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("find series linked to %s: %w", foreignID, err)
+	}
+	return id, nil
 }
 
 // LinkBook inserts a series_books row joining seriesID → bookID.
