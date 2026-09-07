@@ -20,6 +20,8 @@ vi.mock('react-i18next', () => ({
       'addBookModal.added': 'Added',
       'addBookModal.inLibrary': 'In library',
       'addBookModal.inLibraryHint': 'This book is already in your library',
+      'addBookModal.resultSource': 'Found in a provider',
+      'addBookModal.resultSourceLink': 'Open this result on a provider',
       'addBookModal.adding': 'Adding...',
       'addBookModal.addFailed': 'Failed to add book',
       'common.search': 'Search',
@@ -157,6 +159,43 @@ describe('AddBookModal — ASIN lookup (#1189)', () => {
 
     expect(await screen.findByText('Hardcover')).toBeInTheDocument()
     expect(screen.getByText('OpenLibrary')).toBeInTheDocument()
+  })
+
+  // Naming the source is worth more when you can go and look at it. Only the
+  // providers whose public page can be built from the stored id become links;
+  // the rest keep a plain badge rather than one that 404s.
+  it('links a result to its source where a public page exists', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      {
+        foreignBookId: 'OL82587W',
+        title: 'Linked',
+        metadataProvider: 'openlibrary',
+        author: { authorName: 'A' },
+      },
+      {
+        foreignBookId: 'dnb:123456789',
+        title: 'Not linked',
+        metadataProvider: 'dnb',
+        author: { authorName: 'B' },
+      },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'anything' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    const link = await screen.findByRole('link', { name: 'OpenLibrary' })
+    expect(link).toHaveAttribute('href', 'https://openlibrary.org/works/OL82587W')
+    // Opening the source must not navigate away from a modal mid-search.
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+
+    // DNB has no public page built from the stored id, so it stays plain text.
+    expect(screen.getByText('DNB')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'DNB' })).toBeNull()
   })
 
   // Older records predate the provider column, and a result with no provider

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, Book } from '../api/client'
 import { resolveBookQuery } from '../api/booklookup'
-import { providerLabel } from '../util/metadataSource'
+import { metadataSourceLink, providerLabel } from '../util/metadataSource'
 
 interface Props {
   onClose: () => void
@@ -145,6 +145,11 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
               // OpenLibrary. Naming the source is what makes those
               // distinguishable without opening each one.
               const source = providerLabel(book.metadataProvider, book.foreignBookId)
+              // Naming the source is more useful when you can go and look at
+              // it. Only providers whose public page can be built from the
+              // stored id get a link; the rest keep the plain badge rather
+              // than a dead one.
+              const sourceLink = metadataSourceLink(book.foreignBookId, 'book')
               return (
                 <div key={key} className="flex items-center gap-3 p-3 rounded-md bg-slate-200/50 dark:bg-zinc-800/50 hover:bg-slate-200 dark:hover:bg-zinc-800">
                   {book.imageUrl && (
@@ -157,14 +162,24 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
                     )}
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-600">
                       {book.releaseDate && <span>{new Date(book.releaseDate).getFullYear()}</span>}
-                      {source && (
+                      {source && (sourceLink ? (
+                        <a
+                          href={sourceLink.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-1.5 py-0.5 rounded bg-slate-300/70 dark:bg-zinc-700/70 text-slate-700 dark:text-zinc-300 underline decoration-dotted underline-offset-2 hover:bg-slate-400/70 dark:hover:bg-zinc-600/70 hover:decoration-solid"
+                          title={t('addBookModal.resultSourceLink', { provider: source })}
+                        >
+                          {source}
+                        </a>
+                      ) : (
                         <span
                           className="px-1.5 py-0.5 rounded bg-slate-300/70 dark:bg-zinc-700/70 text-slate-700 dark:text-zinc-300"
                           title={t('addBookModal.resultSource', { provider: source })}
                         >
                           {source}
                         </span>
-                      )}
+                      ))}
                       {book.seriesTitle && (
                         <span
                           className={`px-1.5 py-0.5 rounded ${book.seriesInLibrary

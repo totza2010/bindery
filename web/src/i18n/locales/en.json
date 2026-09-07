@@ -1087,6 +1087,7 @@
     "adding": "Adding...",
     "addFailed": "Failed to add book",
     "resultSource": "Found in {{provider}}",
+    "resultSourceLink": "Open this result on {{provider}}",
     "seriesInLibrary": "#{{series}} — already in your library",
     "seriesNotInLibrary": "#{{series}} — not in your library yet",
     "inLibrary": "In library",
