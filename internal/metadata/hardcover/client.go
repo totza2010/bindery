@@ -1515,10 +1515,24 @@ func searchFeaturedSeries(value any) (string, string) {
 	case string:
 		return strings.TrimSpace(v), ""
 	case map[string]any:
+		// featured_series is the book's row in the series, not the series:
+		// its "id" identifies that row (304420 for Order of the Phoenix)
+		// while the series itself is nested under "series" with the id that
+		// addresses it (1185). Reading the outer id gave every search result
+		// a series ID that resolves to nothing, and reading v["series"] as a
+		// string rendered the nested object through fmt.Sprint, so the title
+		// arrived as "map[books_count:34 id:1185 name:Harry Potter ...]".
+		if nested, ok := v["series"].(map[string]any); ok {
+			if title, id := searchFeaturedSeries(nested); strings.TrimSpace(title) != "" {
+				if id == "" {
+					id = searchNumericSeriesID(v["series_id"])
+				}
+				return title, id
+			}
+		}
 		title := firstNonEmpty(
 			searchScalarString(v["name"]),
 			searchScalarString(v["title"]),
-			searchScalarString(v["series"]),
 		)
 		id := firstNonEmpty(
 			searchNumericSeriesID(v["id"]),
