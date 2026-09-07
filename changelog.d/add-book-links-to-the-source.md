@@ -1,2 +1,0 @@
-### Changed
-- **The provider badge on an Add Book result is now a link to that record's page on the provider's own site**, so a result can be checked before it is added rather than after. It becomes a link only where the public URL can be built from the id Bindery already stores — OpenLibrary and Google Books today — and stays plain text everywhere else rather than offering one that 404s. Links open in a new tab, so a search in progress is not lost.
