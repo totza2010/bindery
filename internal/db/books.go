@@ -489,6 +489,63 @@ func (r *BookRepo) GetByIDs(ctx context.Context, ids []int64) (map[int64]*models
 	return out, nil
 }
 
+// ForeignIDsInLibrary reports which of the given provider book IDs the library
+// already holds, keyed by the ID that was asked about.
+//
+// userID scopes the answer the way a browse list is scoped: 0 means no
+// restriction (an admin, or tenancy switched off), anything else limits the
+// answer to that user's books. Without it a search would tell one user which
+// books another had added, which is the cross-user visibility the multi-user
+// audit ruled out.
+//
+// Absent IDs are simply not in the returned map, so a caller can treat a
+// missing key as "not held".
+func (r *BookRepo) ForeignIDsInLibrary(ctx context.Context, foreignIDs []string, userID int64) (map[string]bool, error) {
+	wanted := make([]any, 0, len(foreignIDs))
+	seen := make(map[string]struct{}, len(foreignIDs))
+	for _, id := range foreignIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		wanted = append(wanted, id)
+	}
+	if len(wanted) == 0 {
+		return map[string]bool{}, nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(wanted)), ",")
+	query := "SELECT foreign_id FROM books WHERE foreign_id IN (" + placeholders + ")"
+	args := wanted
+	if userID != 0 {
+		query += " AND owner_user_id = ?"
+		args = append(append([]any{}, wanted...), userID)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("book foreign ids in library: %w", err)
+	}
+	defer rows.Close()
+
+	present := make(map[string]bool, len(wanted))
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("book foreign ids in library: %w", err)
+		}
+		present[id] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("book foreign ids in library: %w", err)
+	}
+	return present, nil
+}
+
 func (r *BookRepo) GetByForeignID(ctx context.Context, foreignID string) (*models.Book, error) {
 	books, err := r.query(ctx, bookCTE+" SELECT "+bookColumns+" FROM books "+bookJoins+" WHERE books.foreign_id = ?", []any{foreignID})
 	if err != nil {

@@ -37,6 +37,9 @@ export interface Book {
   seriesTitle?: string
   seriesPosition?: string
   seriesInLibrary?: boolean
+  // Set on search results the library already holds, so the modal can say so
+  // instead of offering to add the book twice.
+  inLibrary?: boolean
   authorId: number
   title: string
   description: string

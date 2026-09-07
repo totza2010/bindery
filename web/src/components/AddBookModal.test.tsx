@@ -18,6 +18,8 @@ vi.mock('react-i18next', () => ({
       'addBookModal.searchFailed': 'Search failed',
       'addBookModal.idMissing': 'This result has no book ID and cannot be added',
       'addBookModal.added': 'Added',
+      'addBookModal.inLibrary': 'In library',
+      'addBookModal.inLibraryHint': 'This book is already in your library',
       'addBookModal.adding': 'Adding...',
       'addBookModal.addFailed': 'Failed to add book',
       'common.search': 'Search',
@@ -230,6 +232,56 @@ describe('AddBookModal — ASIN lookup (#1189)', () => {
 
     expect(await screen.findByText('Standalone')).toBeInTheDocument()
     expect(screen.queryByText(/^#/)).not.toBeInTheDocument()
+  })
+
+  // The library is checked server-side, so a book already held comes back
+  // marked and must not be offered again.
+  it('disables Add and says so for a book already in the library', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      {
+        foreignBookId: 'hc:428465',
+        title: 'Held Already',
+        metadataProvider: 'hardcover',
+        inLibrary: true,
+        author: { authorName: 'J.K. Rowling' },
+      },
+      {
+        foreignBookId: 'hc:312460',
+        title: 'Not Held',
+        metadataProvider: 'hardcover',
+        author: { authorName: 'Frank Herbert' },
+      },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'anything' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    const held = await screen.findByRole('button', { name: /In library/i })
+    expect(held).toBeDisabled()
+
+    const addable = screen.getByRole('button', { name: /^Add$/i })
+    expect(addable).toBeEnabled()
+  })
+
+  // A held book must not be addable even by a click that races the render.
+  it('does not call the API when a held result is clicked', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      { foreignBookId: 'hc:1', title: 'Held', metadataProvider: 'hardcover', inLibrary: true, author: { authorName: 'A' } },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'anything' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /In library/i }))
+    expect(api.addBook).not.toHaveBeenCalled()
   })
 
   it('still routes a plain title query to searchBooks', async () => {

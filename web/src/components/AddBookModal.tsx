@@ -127,7 +127,9 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
           <div className="mt-4 space-y-2 max-h-[50vh] overflow-y-auto">
             {results.map(book => {
               const key = book.foreignBookId || book.title
-              const isAdded = added.has(book.foreignBookId)
+              // Held either because this session just added it, or because it
+              // was already in the library when the search ran.
+              const isAdded = added.has(book.foreignBookId) || !!book.inLibrary
               const isAdding = adding === book.foreignBookId
               // A book id is all the backend requires. With no
               // foreignAuthorId it resolves the author from the book id
@@ -182,9 +184,21 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
                     onClick={() => addBook(book)}
                     disabled={isAdded || isAdding || !canAdd}
                     className={`px-3 py-1 rounded text-xs font-medium flex-shrink-0 ${isAdded ? 'bg-emerald-700 text-white opacity-75 cursor-default' : 'bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50'}`}
-                    title={!canAdd ? t('addBookModal.idMissing') : undefined}
+                    title={
+                      book.inLibrary
+                        ? t('addBookModal.inLibraryHint')
+                        : !canAdd
+                          ? t('addBookModal.idMissing')
+                          : undefined
+                    }
                   >
-                    {isAdded ? t('addBookModal.added') : isAdding ? t('addBookModal.adding') : t('common.add')}
+                    {book.inLibrary && !added.has(book.foreignBookId)
+                      ? t('addBookModal.inLibrary')
+                      : isAdded
+                        ? t('addBookModal.added')
+                        : isAdding
+                          ? t('addBookModal.adding')
+                          : t('common.add')}
                   </button>
                 </div>
               )
