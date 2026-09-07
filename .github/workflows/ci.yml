@@ -363,9 +363,13 @@ jobs:
       - uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
         id: meta
         with:
+          # Docker Hub is the maintainer's namespace, so a fork building its
+          # own image would push tags it has no credentials for and fail the
+          # job after a successful build. GHCR follows github.repository and
+          # needs no such guard. Upstream behaviour is unchanged.
           images: |
-            ghcr.io/${{ github.repository }}
-            vavallee/bindery
+            name=ghcr.io/${{ github.repository }}
+            name=vavallee/bindery,enable=${{ github.repository_owner == 'vavallee' }}
           tags: |
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
