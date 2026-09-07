@@ -167,10 +167,10 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
                           href={sourceLink.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-1.5 py-0.5 rounded bg-slate-300/70 dark:bg-zinc-700/70 text-slate-700 dark:text-zinc-300 underline decoration-dotted underline-offset-2 hover:bg-slate-400/70 dark:hover:bg-zinc-600/70 hover:decoration-solid"
+                          className="px-1.5 py-0.5 rounded bg-slate-300/70 dark:bg-zinc-700/70 text-sky-700 dark:text-sky-300 hover:underline"
                           title={t('addBookModal.resultSourceLink', { provider: source })}
                         >
-                          {source}
+                          {source} <span aria-hidden="true">↗</span>
                         </a>
                       ) : (
                         <span

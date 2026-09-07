@@ -158,7 +158,9 @@ describe('AddBookModal — ASIN lookup (#1189)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
 
     expect(await screen.findByText('Hardcover')).toBeInTheDocument()
-    expect(screen.getByText('OpenLibrary')).toBeInTheDocument()
+    // OpenLibrary has a public page, so its badge is a link; the arrow beside
+    // the name is decorative and stays out of the accessible name.
+    expect(screen.getByRole('link', { name: 'OpenLibrary' })).toBeInTheDocument()
   })
 
   // Naming the source is worth more when you can go and look at it. Only the
