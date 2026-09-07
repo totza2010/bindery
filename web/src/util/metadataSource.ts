@@ -4,10 +4,10 @@
 // internal/metadata/aggregator_providers.go and models.AuthorProviderFromForeignID.
 //
 // We only emit a link when the public URL can be constructed reliably from the
-// stored ID. OpenLibrary (bare OL keys) and Google Books (gb:) qualify;
-// Hardcover (hc:), DNB (dnb:), Calibre and Audiobookshelf do not — their stored
-// IDs don't map to a stable public page — so those return null rather than risk
-// a dead link.
+// stored ID. OpenLibrary (bare OL keys), Google Books (gb:) and Hardcover (hc:)
+// qualify; DNB (dnb:), Calibre and Audiobookshelf do not — their stored IDs
+// don't map to a stable public page — so those return null rather than risk a
+// dead link.
 
 export type MetadataSourceLink = { url: string; label: string }
 
@@ -25,8 +25,24 @@ export function metadataSourceLink(
     return { url: `https://books.google.com/books?id=${encodeURIComponent(vol)}`, label: 'Google Books' }
   }
 
+  // Hardcover stores the slug its own site routes on, so both kinds map to a
+  // page: hardcover.app/books/<slug> and /authors/<slug>.
+  //
+  // Except when the record had no slug. `toBook` and `toAuthor` fall back to
+  // the numeric primary key there (internal/metadata/hardcover/client.go), and
+  // hardcover.app 404s on those, so an all-digit value gets no link. A numeric
+  // slug is possible and would be losing a working link, but the two are
+  // indistinguishable from the stored ID alone and a dead link is the worse of
+  // the two failures.
+  if (id.startsWith('hc:')) {
+    const slug = id.slice(3).trim()
+    if (!slug || /^\d+$/.test(slug)) return null
+    const path = kind === 'author' ? 'authors' : 'books'
+    return { url: `https://hardcover.app/${path}/${encodeURIComponent(slug)}`, label: 'Hardcover' }
+  }
+
   // No reliable public URL for these providers.
-  if (id.startsWith('hc:') || id.startsWith('dnb:') || id.startsWith('abs:') || id.startsWith('calibre:')) {
+  if (id.startsWith('dnb:') || id.startsWith('abs:') || id.startsWith('calibre:')) {
     return null
   }
 
