@@ -176,6 +176,62 @@ describe('AddBookModal — ASIN lookup (#1189)', () => {
     expect(screen.getByText('Unknown source')).toBeInTheDocument()
   })
 
+  // Hardcover reports which series a book belongs to and where it sits; the
+  // library is checked server-side so the modal does not have to fetch every
+  // series it owns to answer one question.
+  it('shows the series and marks the one already in the library', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      {
+        foreignBookId: 'hc:428465',
+        title: 'Harry Potter and the Order of the Phoenix',
+        metadataProvider: 'hardcover',
+        seriesForeignId: 'hc-series:1185',
+        seriesTitle: 'Harry Potter',
+        seriesPosition: '5',
+        seriesInLibrary: true,
+        author: { authorName: 'J.K. Rowling' },
+      },
+      {
+        foreignBookId: 'hc:312460',
+        title: 'Dune',
+        metadataProvider: 'hardcover',
+        seriesForeignId: 'hc-series:2',
+        seriesTitle: 'Dune',
+        seriesPosition: '1',
+        author: { authorName: 'Frank Herbert' },
+      },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'anything' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    // The held series is ticked, the one not held is not.
+    expect(await screen.findByText(/#5 Harry Potter/)).toHaveTextContent('✓')
+    expect(screen.getByText(/#1 Dune/)).not.toHaveTextContent('✓')
+  })
+
+  // Providers other than Hardcover report no series, and a book can be a
+  // standalone in any case.
+  it('shows no series label when the result carries none', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      { foreignBookId: 'OL1W', title: 'Standalone', metadataProvider: 'openlibrary', author: { authorName: 'A' } },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'anything' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    expect(await screen.findByText('Standalone')).toBeInTheDocument()
+    expect(screen.queryByText(/^#/)).not.toBeInTheDocument()
+  })
+
   it('still routes a plain title query to searchBooks', async () => {
     vi.mocked(api.searchBooks).mockResolvedValue([
       { foreignBookId: 'OL-DUNE', title: 'Dune', author: { authorName: 'Frank Herbert' } },
