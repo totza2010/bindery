@@ -1,6 +1,8 @@
 package hardcover
 
 import (
+	"context"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -94,5 +96,69 @@ func TestSeriesCatalogQueryExcludesCompilations(t *testing.T) {
 	}
 	if !strings.Contains(seriesCatalogQuery, "users_count: desc_nulls_last") {
 		t.Error("GetBooksBySeries no longer orders competing entries by reader count")
+	}
+}
+
+// The collapse has to be reached through GetSeriesCatalog, not only called
+// directly: the whole bug is that title dedup runs on this path and cannot see
+// a translation, so a test that skips the path would not have caught it.
+func TestGetSeriesCatalogKeepsOneBookPerPosition(t *testing.T) {
+	c := newMockClient(func(r *http.Request) (*http.Response, error) {
+		data := map[string]interface{}{
+			"series_by_pk": map[string]interface{}{
+				"id":          1185,
+				"name":        "Harry Potter",
+				"books_count": 7,
+				"author":      map[string]interface{}{"name": "J.K. Rowling"},
+				"book_series": []map[string]interface{}{
+					{
+						"position": 1,
+						"book": map[string]interface{}{
+							"id":          328491,
+							"title":       "Harry Potter and the Philosopher's Stone",
+							"slug":        "harry-potter-and-the-philosophers-stone",
+							"users_count": 17351,
+						},
+					},
+					{
+						"position": 1,
+						"book": map[string]interface{}{
+							"id":          1945721,
+							"title":       "Гарри Поттер и философский камень",
+							"slug":        "garri-potter-i-filosofskii-kamen",
+							"users_count": 40,
+						},
+					},
+					{
+						"position": 2,
+						"book": map[string]interface{}{
+							"id":          429306,
+							"title":       "Harry Potter and the Chamber of Secrets",
+							"slug":        "harry-potter-and-the-chamber-of-secrets",
+							"users_count": 13542,
+						},
+					},
+				},
+			},
+		}
+		return gqlResponse(t, http.StatusOK, data), nil
+	})
+
+	catalog, err := c.GetSeriesCatalog(context.Background(), "hc-series:1185")
+	if err != nil {
+		t.Fatalf("GetSeriesCatalog: %v", err)
+	}
+	if len(catalog.Books) != 2 {
+		ids := make([]string, 0, len(catalog.Books))
+		for _, book := range catalog.Books {
+			ids = append(ids, book.ForeignID)
+		}
+		t.Fatalf("catalog holds %d books, want one per position: %s", len(catalog.Books), strings.Join(ids, ", "))
+	}
+	if got := catalog.Books[0].ForeignID; got != "hc:harry-potter-and-the-philosophers-stone" {
+		t.Errorf("position 1 = %q, want the English novel", got)
+	}
+	if got := catalog.Books[1].ForeignID; got != "hc:harry-potter-and-the-chamber-of-secrets" {
+		t.Errorf("position 2 = %q", got)
 	}
 }
