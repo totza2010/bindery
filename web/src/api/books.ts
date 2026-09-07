@@ -30,6 +30,13 @@ export interface Book {
   // Every other provider id the same book is known by (#1705). Only populated
   // on the single-book GET.
   identifiers?: BookIdentifier[]
+  // The series this book chiefly belongs to, and whether the library already
+  // holds it. Only set on book *search* results, and only for providers that
+  // report a series — Hardcover does, the others do not.
+  seriesForeignId?: string
+  seriesTitle?: string
+  seriesPosition?: string
+  seriesInLibrary?: boolean
   authorId: number
   title: string
   description: string

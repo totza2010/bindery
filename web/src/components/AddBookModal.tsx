@@ -163,6 +163,19 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
                           {source}
                         </span>
                       )}
+                      {book.seriesTitle && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded ${book.seriesInLibrary
+                            ? 'bg-emerald-200 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200'
+                            : 'bg-slate-300/70 dark:bg-zinc-700/70 text-slate-700 dark:text-zinc-300'}`}
+                          title={book.seriesInLibrary
+                            ? t('addBookModal.seriesInLibrary', { series: book.seriesTitle })
+                            : t('addBookModal.seriesNotInLibrary', { series: book.seriesTitle })}
+                        >
+                          {book.seriesPosition ? `#${book.seriesPosition} ${book.seriesTitle}` : book.seriesTitle}
+                          {book.seriesInLibrary && ' ✓'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button

@@ -1086,7 +1086,9 @@
     "added": "Added",
     "adding": "Adding...",
     "addFailed": "Failed to add book",
-    "resultSource": "Found in {{provider}}"
+    "resultSource": "Found in {{provider}}",
+    "seriesInLibrary": "#{{series}} — already in your library",
+    "seriesNotInLibrary": "#{{series}} — not in your library yet"
   },
   "authorMetadataLink": {
     "actionLink": "Link metadata",
