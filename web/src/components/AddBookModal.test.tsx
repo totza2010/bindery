@@ -127,6 +127,55 @@ describe('AddBookModal — ASIN lookup (#1189)', () => {
     expect(api.searchBooks).not.toHaveBeenCalled()
   })
 
+  // A search fans out across every configured provider, so the same title can
+  // come back from several catalogues at once. Without the source named, the
+  // novel and its sheet music are two identical-looking rows.
+  it('names the provider each result came from', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      {
+        foreignBookId: 'hc:328491',
+        title: 'Harry Potter and the Order of the Phoenix',
+        metadataProvider: 'hardcover',
+        author: { authorName: 'J.K. Rowling' },
+      },
+      {
+        foreignBookId: 'OL82587W',
+        title: 'Harry Potter and the Order of the Phoenix',
+        metadataProvider: 'openlibrary',
+        author: { authorName: 'John Williams' },
+      },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'Harry Potter and the Order of the Phoenix' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    expect(await screen.findByText('Hardcover')).toBeInTheDocument()
+    expect(screen.getByText('OpenLibrary')).toBeInTheDocument()
+  })
+
+  // Older records predate the provider column, and a result with no provider
+  // at all must not render an empty badge.
+  it('falls back to the foreign id prefix, and shows nothing when neither is known', async () => {
+    vi.mocked(api.searchBooks).mockResolvedValue([
+      { foreignBookId: 'hc:1', title: 'Prefixed', author: { authorName: 'A' } },
+      { foreignBookId: '', title: 'Unknown source', author: { authorName: 'B' } },
+    ] as never)
+
+    render(<AddBookModal onClose={onClose} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByPlaceholderText(/Title, ISBN, or ASIN/i), {
+      target: { value: 'anything' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }))
+
+    expect(await screen.findByText('Hardcover')).toBeInTheDocument()
+    expect(screen.getByText('Unknown source')).toBeInTheDocument()
+  })
+
   it('still routes a plain title query to searchBooks', async () => {
     vi.mocked(api.searchBooks).mockResolvedValue([
       { foreignBookId: 'OL-DUNE', title: 'Dune', author: { authorName: 'Frank Herbert' } },

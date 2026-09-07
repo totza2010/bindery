@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, Book } from '../api/client'
 import { resolveBookQuery } from '../api/booklookup'
+import { providerLabel } from '../util/metadataSource'
 
 interface Props {
   onClose: () => void
@@ -136,6 +137,12 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
               // Gating on the name blocked ISBN results the API would have
               // accepted (#2187).
               const canAdd = !!book.foreignBookId
+              // A search fans out across every configured provider, so one
+              // title can appear several times from different catalogues —
+              // the novel from Hardcover beside its sheet music from
+              // OpenLibrary. Naming the source is what makes those
+              // distinguishable without opening each one.
+              const source = providerLabel(book.metadataProvider, book.foreignBookId)
               return (
                 <div key={key} className="flex items-center gap-3 p-3 rounded-md bg-slate-200/50 dark:bg-zinc-800/50 hover:bg-slate-200 dark:hover:bg-zinc-800">
                   {book.imageUrl && (
@@ -146,9 +153,17 @@ export default function AddBookModal({ onClose, onAdded }: Props) {
                     {book.author && (
                       <div className="text-xs text-slate-600 dark:text-zinc-500">{book.author.authorName}</div>
                     )}
-                    {book.releaseDate && (
-                      <div className="text-xs text-slate-500 dark:text-zinc-600">{new Date(book.releaseDate).getFullYear()}</div>
-                    )}
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-600">
+                      {book.releaseDate && <span>{new Date(book.releaseDate).getFullYear()}</span>}
+                      {source && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-slate-300/70 dark:bg-zinc-700/70 text-slate-700 dark:text-zinc-300"
+                          title={t('addBookModal.resultSource', { provider: source })}
+                        >
+                          {source}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={() => addBook(book)}

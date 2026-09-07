@@ -86,3 +86,45 @@ export function hardcoverSeriesUrl(slug: string | undefined | null): string | nu
   if (!value) return null
   return `https://hardcover.app/series/${encodeURIComponent(value)}`
 }
+
+// Display name for a metadata provider.
+//
+// The backend normalizes provider names in
+// internal/metadata/aggregator_providers.go and stamps one onto every search
+// result, so a result list that mixes providers can say which is which. The
+// stored value is a lower-case key; this is the name a reader recognises.
+//
+// Returns null when the provider is unknown, so a caller can leave the label
+// out rather than print a key nobody set.
+export function providerLabel(
+  provider: string | undefined | null,
+  foreignId?: string | undefined | null,
+): string | null {
+  switch ((provider ?? '').trim().toLowerCase()) {
+    case 'hardcover':
+      return 'Hardcover'
+    case 'openlibrary':
+      return 'OpenLibrary'
+    case 'googlebooks':
+      return 'Google Books'
+    case 'dnb':
+      return 'DNB'
+    case 'calibre':
+      return 'Calibre'
+    case 'audiobookshelf':
+      return 'Audiobookshelf'
+  }
+
+  // Older records predate the provider column; their foreign ID still carries
+  // the prefix the backend assigns.
+  const id = (foreignId ?? '').trim()
+  if (id.startsWith('hc:')) return 'Hardcover'
+  if (id.startsWith('gb:')) return 'Google Books'
+  if (id.startsWith('dnb:')) return 'DNB'
+  if (id.startsWith('abs:')) return 'Audiobookshelf'
+  if (id.startsWith('calibre:')) return 'Calibre'
+  if (/^OL\w+[AWM]$/i.test(id)) return 'OpenLibrary'
+
+  const raw = (provider ?? '').trim()
+  return raw === '' ? null : raw
+}

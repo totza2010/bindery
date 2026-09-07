@@ -1085,7 +1085,8 @@
     "idMissing": "This result has no book ID and cannot be added",
     "added": "Added",
     "adding": "Adding...",
-    "addFailed": "Failed to add book"
+    "addFailed": "Failed to add book",
+    "resultSource": "Found in {{provider}}"
   },
   "authorMetadataLink": {
     "actionLink": "Link metadata",
